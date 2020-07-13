@@ -186,7 +186,7 @@ static char * b64_encode(unsigned const char* ptr, long len) {
  * The FUSE operations originally ripped from the hello_ll sample.
  */
 
-static int httpfs_stat(fuse_ino_t ino, struct stat *stbuf)
+static off_t httpfs_stat(fuse_ino_t ino, struct stat *stbuf)
 {
     stbuf->st_ino = ino;
     switch (ino) {
@@ -199,7 +199,7 @@ static int httpfs_stat(fuse_ino_t ino, struct stat *stbuf)
                     struct_url * url = thread_setup();
                     stbuf->st_mode = S_IFREG | 0444;
                     stbuf->st_nlink = 1;
-                    return (int) get_stat(url, stbuf);
+                    return get_stat(url, stbuf);
                 }; break;
 
         default:
@@ -271,7 +271,7 @@ static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize,
 
     if (off < bufsize)
         return fuse_reply_buf(req, buf + off,
-                min(bufsize - (size_t)off, maxsize));
+                (size_t)min(bufsize - off, maxsize));
     else
         return fuse_reply_buf(req, NULL, 0);
 }
@@ -325,7 +325,7 @@ static void httpfs_read(fuse_req_t req, fuse_ino_t ino, size_t size,
 
     assert(url->file_size >= off);
 
-    size=min(size, (size_t)(url->file_size - off));
+    size = (size_t)min(size, (url->file_size - off));
 
     if(url->file_size == off) {
         /* Handling of EOF is not well documented, returning EOF as error
@@ -667,7 +667,7 @@ static char * url_encode(char * path) {
 
 static int init_url(struct_url* url)
 {
-    memset(url, 0, sizeof(url));
+    memset(url, 0, sizeof(*url));
     url->sock_type = SOCK_CLOSED;
     url->timeout = TIMEOUT;
 #ifdef USE_SSL
@@ -1525,7 +1525,7 @@ static ssize_t get_data(struct_url *url, off_t start, size_t size)
 
     if (content_length != size) {
         plain_report("didn't yield the whole piece.", "GET", 0, 0);
-        size = min((size_t)content_length, size);
+        size = (size_t)min(content_length, size);
     }
 
 
