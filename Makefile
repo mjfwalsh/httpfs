@@ -66,20 +66,22 @@ clean-recursive:
 	$(MAKE) CPPFLAGS='$(CPPFLAGS) -DRETRY_ON_RESET' binsuffix=-rst$(binsuffix) $*
 
 # Rules to automatically make a Debian package
-
-package = $(shell dpkg-parsechangelog | grep ^Source: | sed -e s,'^Source: ',,)
-version = $(shell dpkg-parsechangelog | grep ^Version: | sed -e s,'^Version: ',, -e 's,-.*,,')
-revision = $(shell dpkg-parsechangelog | grep ^Version: | sed -e -e 's,.*-,,')
-architecture = $(shell dpkg --print-architecture)
-tar_dir = $(package)-$(version)
-tar_gz   = $(tar_dir).tar.gz
-pkg_deb_dir = pkgdeb
-unpack_dir  = $(pkg_deb_dir)/$(tar_dir)
-orig_tar_gz = $(pkg_deb_dir)/$(package)_$(version).orig.tar.gz
-pkg_deb_src = $(pkg_deb_dir)/$(package)_$(version)-$(revision)_source.changes
-pkg_deb_bin = $(pkg_deb_dir)/$(package)_$(version)-$(revision)_$(architecture).changes
-
-deb_pkg_key = CB8C5858
+# Avoid setting these on MacOS as it has no parsechangelog or dpkg commands
+OS := $(shell uname)
+ifneq ($(OS),Darwin)
+	package = $(shell dpkg-parsechangelog | grep ^Source: | sed -e s,'^Source: ',,)
+	version = $(shell dpkg-parsechangelog | grep ^Version: | sed -e s,'^Version: ',, -e 's,-.*,,')
+	revision = $(shell dpkg-parsechangelog | grep ^Version: | sed -e -e 's,.*-,,')
+	architecture = $(shell dpkg --print-architecture)
+	tar_dir = $(package)-$(version)
+	tar_gz   = $(tar_dir).tar.gz
+	pkg_deb_dir = pkgdeb
+	unpack_dir  = $(pkg_deb_dir)/$(tar_dir)
+	orig_tar_gz = $(pkg_deb_dir)/$(package)_$(version).orig.tar.gz
+	pkg_deb_src = $(pkg_deb_dir)/$(package)_$(version)-$(revision)_source.changes
+	pkg_deb_bin = $(pkg_deb_dir)/$(package)_$(version)-$(revision)_$(architecture).changes
+	deb_pkg_key = CB8C5858
+endif
 
 debclean:
 	rm -rf $(pkg_deb_dir)
