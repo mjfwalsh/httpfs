@@ -23,7 +23,7 @@ single URL can be mounted. The server must be able to send byte ranges.
 OPTIONS
 -------
 *-c 'console'*::
-    Attempt to use the file ior device 'console' for output after fork.
+    Attempt to use the file or device 'console' for output after fork.
     The default is '/dev/console'.
 
 *-f*::
