@@ -1,0 +1,6 @@
+.DS_Store
+httpfs2
+httpfs2-mt
+httpfs2-ssl
+httpfs2-ssl-mt
+*.dSYM
