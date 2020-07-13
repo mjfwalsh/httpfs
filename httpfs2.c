@@ -109,7 +109,9 @@ static int open_client_socket(struct_url *url);
 static int close_client_socket(struct_url *url);
 static int close_client_force(struct_url *url);
 static struct_url * thread_setup(void);
+#ifdef USE_THREAD
 static void destroy_url_copy(void *);
+#endif
 
 /* Protocol symbols. */
 #define PROTO_HTTP 0
@@ -271,7 +273,7 @@ static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize,
 
     if (off < bufsize)
         return fuse_reply_buf(req, buf + off,
-                (size_t)min(bufsize - off, maxsize));
+                (size_t)min(bufsize - (size_t)off, maxsize));
     else
         return fuse_reply_buf(req, NULL, 0);
 }
@@ -325,7 +327,7 @@ static void httpfs_read(fuse_req_t req, fuse_ino_t ino, size_t size,
 
     assert(url->file_size >= off);
 
-    size = (size_t)min(size, (url->file_size - off));
+    size = (size_t)min(size, (size_t)(url->file_size - off));
 
     if(url->file_size == off) {
         /* Handling of EOF is not well documented, returning EOF as error
@@ -397,43 +399,7 @@ static int mempref(const char * mem, const char * pref, size_t size, int case_se
 
 static void errno_report(const char * where);
 static void ssl_error(int error, gnutls_session_t ss, const char * where);
-/* Functions to deal with gnutls_datum_t stolen from gnutls docs.
- * The structure does not seem documented otherwise.
- */
-static gnutls_datum_t
-load_file (const char *file)
-{
-    FILE *f;
-    gnutls_datum_t loaded_file = { NULL, 0 };
-    long filelen;
-    void *ptr;
-    f = fopen (file, "r");
-    if (!f)
-        errno_report(file);
-    else if (fseek (f, 0, SEEK_END) != 0)
-        errno_report(file);
-    else if ((filelen = ftell (f)) < 0)
-        errno_report(file);
-    else if (fseek (f, 0, SEEK_SET) != 0)
-        errno_report(file);
-    else if (!(ptr = malloc ((size_t) filelen)))
-        errno_report(file);
-    else if (fread (ptr, 1, (size_t) filelen, f) < (size_t) filelen)
-        errno_report(file);
-    else {
-        loaded_file.data = ptr;
-        loaded_file.size = (unsigned int) filelen;
-        fprintf(stderr, "Loaded '%s' %ld bytes\n", file, filelen);
-        /* fwrite(ptr, filelen, 1, stderr); */
-    }
-    return loaded_file;
-}
 
-static void
-unload_file (gnutls_datum_t data)
-{
-    free (data.data);
-}
 
 /* This function will print some details of the
  * given session.
@@ -495,10 +461,6 @@ print_ssl_info (gnutls_session_t session)
     tmp =
         gnutls_certificate_type_get_name (gnutls_certificate_type_get (session));
     printf ("- Certificate Type: %s\n", tmp);
-    /* print the compression algorithm (if any)
-    */
-    tmp = gnutls_compression_get_name (gnutls_compression_get (session));
-    printf ("- Compression: %s\n", tmp);
     /* print the name of the cipher used.
      * ie 3DES.
      */
@@ -586,7 +548,7 @@ verify_certificate_callback (gnutls_session_t session)
     {
         int found = 0;
         if (hostname) {
-            int i;
+            unsigned int i;
             size_t len = strlen(hostname);
             if (*(hostname+len-1) == '.') len--;
             if (!(url->ssl_connected)) printf ("Server hostname verification failed. Trying to peek into the cert.\n");
@@ -673,27 +635,6 @@ static int init_url(struct_url* url)
 #ifdef USE_SSL
     url->cafile = CERT_STORE;
 #endif
-    return 0;
-}
-
-static int free_url(struct_url* url)
-{
-    if(url->host) free(url->host);
-    url->host = 0;
-    if(url->path) free(url->path);
-    url->path = 0;
-    if(url->name) free(url->name);
-    url->name = 0;
-#ifdef USE_AUTH
-    if(url->auth) free(url->auth);
-    url->auth = 0;
-#endif
-    if(url->sock_type != SOCK_CLOSED)
-        close_client_force(url);
-    url->port = 0;
-    url->proto = 0; /* only after socket closed */
-    url->file_size=0;
-    url->last_modified=0;
     return 0;
 }
 
@@ -1021,7 +962,7 @@ static int close_client_force(struct_url *url) {
 static void destroy_url_copy(void * urlptr)
 {
     if(urlptr){
-        fprintf(stderr, "%s: Thread %08lX ended.\n", argv0, pthread_self());
+        fprintf(stderr, "%s: Thread %d ended.\n", argv0, (int)pthread_self());
         close_client_force(urlptr);
         free(urlptr);
     }
@@ -1038,7 +979,7 @@ static struct_url * thread_setup(void)
 {
     struct_url * res = pthread_getspecific(url_key);
     if(!res) {
-        fprintf(stderr, "%s: Thread %08lX started.\n", argv0, pthread_self());
+        fprintf(stderr, "%s: Thread %d started.\n", argv0, (int)pthread_self());
         res = create_url_copy(&main_url);
         pthread_setspecific(url_key, res);
     }
@@ -1525,7 +1466,7 @@ static ssize_t get_data(struct_url *url, off_t start, size_t size)
 
     if (content_length != size) {
         plain_report("didn't yield the whole piece.", "GET", 0, 0);
-        size = (size_t)min(content_length, size);
+        size = (size_t)min((size_t)content_length, size);
     }
 
 
