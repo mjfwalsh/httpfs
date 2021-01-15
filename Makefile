@@ -3,7 +3,6 @@ MAIN_CPPFLAGS := -Wall -Wno-unused-function -Wconversion -Wtype-limits -DUSE_AUT
 THR_CPPFLAGS := -DUSE_THREAD
 THR_LDFLAGS := -lpthread
 MAIN_LDFLAGS := $(shell pkg-config fuse --libs | sed -e s/-lrt// -e s/-ldl// -e s/-pthread// -e "s/  / /g")
-A2X_AVAILABLE := $(shell which a2x)
 variants := -mt
 intermediates =
 
@@ -20,9 +19,7 @@ binbase = httpfs2
 
 binaries = $(addsuffix $(binsuffix),$(binbase))
 
-ifdef A2X_AVAILABLE
 manpages = $(addsuffix .1,$(binaries))
-endif
 
 intermediates += $(addsuffix .xml,$(manpages))
 
@@ -32,9 +29,6 @@ full:
 	$(MAKE) all $(addprefix all,$(variants))
 
 all: $(targets)
-ifndef A2X_AVAILABLE
-	$(warning Not compiling docs as can't find a2x)
-endif
 
 httpfs2$(binsuffix): httpfs2.c
 	$(CC) $(MAIN_CPPFLAGS) $(CPPFLAGS) $(MAIN_CFLAGS) $(CFLAGS) httpfs2.c $(MAIN_LDFLAGS) $(LDFLAGS) -o $@
@@ -50,8 +44,8 @@ clean-recursive:
 %-full:
 	$(MAKE) $* $(addprefix $*,$(variants))
 
-%.1: %.1.txt
-	a2x -f manpage $<
+%.1: %.pod
+	pod2man -c '' -r '' -d `date -r $*.pod +"%x"` $*.pod $@
 
 %-ssl: $*
 	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(SSL_CPPFLAGS)' LDFLAGS='$(LDFLAGS) $(SSL_LDFLAGS)' binsuffix=-ssl$(binsuffix) $*

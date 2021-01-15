@@ -1,0 +1,81 @@
+=for comment
+HTTPFS2(1)
+===========
+Michal Suchanek <hramrach@centrum.cz>
+
+=head1 NAME
+
+httpfs2 - mount a file from a http server into the filesystem
+
+=head1 SYNOPSIS
+
+E<10> B<httpfs2> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>E<10> B<httpfs2-mt> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>E<10> B<httpfs2-ssl> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>E<10> B<httpfs2-ssl-mt> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>
+
+=head1 DESCRIPTION
+
+httpfs2 is a B<FUSE> based filesystem for mounting http or https URLS as files in
+the filesystem. There is no notion of listable directories in http so only a
+single URL can be mounted. The server must be able to send byte ranges.
+
+=head1 OPTIONS
+
+=over
+
+=item B<-c> I<console>
+
+Attempt to use the file or device F<console> for output after fork.
+The default is F</dev/console>.
+
+=item B<-f>
+
+Do not fork, stay in foreground.
+
+=item B<-t> I<timeout>
+
+Use different timeout for connections. Defaults to 30 seconds.
+
+=item I<URL>
+
+The url should specify the protocol as http or https, and it may specify
+basic authentication username and password. Currently special characters
+like whitespace are not handled so the URL cannot contain them.  See a
+sample URL below:
+
+http://user:password@server.com/dir/file
+
+=item I<FUSE-OPTIONS>
+
+These options are passed to the *FUSE* library. At the very least the mount point should be specified.
+
+=back
+
+=head1 EXIT STATUS
+
+=over
+
+=item B<0>
+
+Successfully connected to the server
+
+=item B<other>
+
+Failure (url parsing error, server error, FUSE setup error). Some FUSE errors may happen only after the process forks so they will not be returned in exit value.
+
+=back
+
+=head1 BUGS
+
+The process can be stopped by typing ^Z on the terminal which may not be desirable under some circumstances.
+
+=head1 AUTHORS
+
+ Miklos Szeredi <miklos@szeredi.hu>
+ hmb  marionraven at users.sourceforge.net
+ Michal Suchanek <hramrach@centrum.cz>
+
+=head1 COPYING
+
+Free use of this software is granted under the terms of the GNU General Public
+License (GPL).
+
+=cut
