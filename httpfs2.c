@@ -65,6 +65,8 @@ static pthread_key_t url_key;
 
 static char* argv0;
 
+struct fuse_session *se;
+
 #define MAX_REQUEST (32*1024)
 #define SOCK_CLOSED 0
 #define SOCK_OPEN 1
@@ -904,7 +906,6 @@ int main(int argc, char *argv[])
                         close (fd);
                     }
 
-                    struct fuse_session *se;
                     se = fuse_lowlevel_new(&args, &httpfs_oper,
                             sizeof(httpfs_oper), NULL);
                     if (se != NULL) {
@@ -1265,7 +1266,13 @@ parse_header(struct_url *url, const char * buf, size_t bytes,
                 argv0, method, status, (int)((end - ptr) - 1), ptr);
         if (!strcmp("HEAD", method)) fwrite(buf, bytes, 1, stderr); /*DEBUG*/
         errno = EIO;
-        if (status == 404) errno = ENOENT;
+
+        // quit on any 4XX or 5XX http error
+        if (status >= 400) {
+            errno = ENOENT;
+            if(se)
+                fuse_session_exit(se);
+        }
         return -1;
     }
 
