@@ -1328,8 +1328,9 @@ parse_header(struct_url *url, const char * buf, size_t bytes,
         }
         if( mempref(ptr, date, (size_t)(end - ptr), 0) ){
             memset(&tm, 0, sizeof(tm));
-            if(!strptime(ptr + strlen(date),
-                        "%n%a, %d %b %Y %T %Z", &tm)){
+            const char *p = ptr + strlen(date);
+            while(*p == ' ') p++; //strptime's %n format is not reliable
+            if(!strptime(p, "%a, %d %b %Y %T %Z", &tm)){
                 plain_report("invalid time",
                         method, ptr + strlen(date),
                         (size_t)(end - ptr) - strlen(date)) ;
