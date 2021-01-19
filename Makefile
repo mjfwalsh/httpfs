@@ -3,61 +3,25 @@ MAIN_CPPFLAGS := -Wall -Wno-unused-function -Wconversion -Wtype-limits -DUSE_AUT
 THR_CPPFLAGS := -DUSE_THREAD
 THR_LDFLAGS := -lpthread
 MAIN_LDFLAGS := $(shell pkg-config fuse --libs | sed -e s/-lrt// -e s/-ldl// -e s/-pthread// -e "s/  / /g")
-variants := -mt
-intermediates =
 
 ifeq ($(shell pkg-config --atleast-version 2.10 gnutls ; echo $$?), 0)
-
-    variants += -ssl -ssl-mt
-
     CERT_STORE := /etc/ssl/certs/ca-certificates.crt
     SSL_CPPFLAGS := -DUSE_SSL $(shell pkg-config gnutls --cflags) -DCERT_STORE=\"$(CERT_STORE)\"
     SSL_LDFLAGS := $(shell pkg-config gnutls --libs)
 endif
 
-binbase = httpfs2
-
-binaries = $(addsuffix $(binsuffix),$(binbase))
-
-manpages = $(addsuffix .1,$(binaries))
-
-intermediates += $(addsuffix .xml,$(manpages))
-
-targets = $(binaries) $(manpages)
-
-full:
-	$(MAKE) all $(addprefix all,$(variants))
+targets = httpfs2 httpfs2.1
 
 all: $(targets)
 
-httpfs2$(binsuffix): httpfs2.c
-	$(CC) $(MAIN_CPPFLAGS) $(CPPFLAGS) $(MAIN_CFLAGS) $(CFLAGS) httpfs2.c $(MAIN_LDFLAGS) $(LDFLAGS) -o $@
+httpfs2: httpfs2.c
+	$(CC) $(MAIN_CPPFLAGS) $(CPPFLAGS) $(SSL_CPPFLAGS) $(THR_CPPFLAGS) $(MAIN_CFLAGS) $(CFLAGS) $< $(MAIN_LDFLAGS) $(LDFLAGS) $(THR_LDFLAGS) $(SSL_LDFLAGS) -o $@
 
-httpfs2%.1: httpfs2.1
-	ln -sf httpfs2.1 $@
+clean:
+	rm -f $(targets)
 
-clean: clean-recursive-full
-
-clean-recursive:
-	rm -f $(targets) $(intermediates)
-
-%-full:
-	$(MAKE) $* $(addprefix $*,$(variants))
-
-%.1: %.pod
-	pod2man -c '' -r '' -d `date -r $*.pod +"%x"` $*.pod $@
-
-%-ssl: $*
-	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(SSL_CPPFLAGS)' LDFLAGS='$(LDFLAGS) $(SSL_LDFLAGS)' binsuffix=-ssl$(binsuffix) $*
-
-%-mt: $*
-	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(THR_CPPFLAGS)' LDFLAGS='$(LDFLAGS) $(THR_LDFLAGS)' binsuffix=-mt$(binsuffix) $*
-
-%-lstr: $*
-	$(MAKE) CPPFLAGS='$(CPPFLAGS) -DNEED_STRNDUP -U_XOPEN_SOURCE -D_XOPEN_SOURCE=500' binsuffix=-lstr$(binsuffix) $*
-
-%-rst: $*
-	$(MAKE) CPPFLAGS='$(CPPFLAGS) -DRETRY_ON_RESET' binsuffix=-rst$(binsuffix) $*
+httpfs2.1: httpfs2.pod
+	pod2man -c '' -r '' -d `date -r $< +"%x"` $< $@
 
 # Rules to automatically make a Debian package
 # Avoid setting these on MacOS as it has no parsechangelog or dpkg commands

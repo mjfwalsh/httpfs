@@ -45,13 +45,10 @@
 #include <stddef.h>
 #include <inttypes.h>
 
-#ifdef USE_THREAD
 #include <pthread.h>
 static pthread_key_t url_key;
-#define FUSE_LOOP fuse_session_loop_mt
-#else
-#define FUSE_LOOP fuse_session_loop
-#endif
+
+int threaded_mode = 0;
 
 #ifdef USE_SSL
 #include <gnutls/gnutls.h>
@@ -82,9 +79,7 @@ typedef struct url {
 #ifdef USE_AUTH
     char * auth; /*encoded auth data*/
 #endif
-#ifdef RETRY_ON_RESET
     int retry_reset; /*retry reset connections*/
-#endif
     int sockfd;
     int sock_type;
 #ifdef USE_SSL
@@ -111,9 +106,7 @@ static int open_client_socket(struct_url *url);
 static int close_client_socket(struct_url *url);
 static int close_client_force(struct_url *url);
 static struct_url * thread_setup(void);
-#ifdef USE_THREAD
 static void destroy_url_copy(void *);
-#endif
 
 /* Protocol symbols. */
 #define PROTO_HTTP 0
@@ -748,24 +741,25 @@ static int parse_url(const char * url, struct_url* res)
 static void usage(void)
 {
         fprintf(stderr, "%s >>> Version: %s <<<\n", __FILE__, VERSION);
-        fprintf(stderr, "usage:  %s [-c [console]] "
+        fprintf(stderr, "usage:  %s [-c console] "
+                "[-f] [-t timeout] [-r] [-m] "
 #ifdef USE_SSL
-                "[-a file] [-d n] [-5] [-2] "
+                "[-a file] [-d n] [-5] [-2]\n\t    \t"
 #endif
-                "[-f] [-t timeout] [-r] url mount-parameters\n\n", argv0);
+                "url [mount-parameters] mount-point\n\n", argv0);
+
         fprintf(stderr, "\t -c \tuse console for standard input/output/error (default: %s)\n", CONSOLE);
+        fprintf(stderr, "\t -f \tstay in foreground and do not fork\n");
+        fprintf(stderr, "\t -r \tretry connection on reset\n");
+        fprintf(stderr, "\t -t \tset socket timeout in seconds (default: %i)\n", TIMEOUT);
+        fprintf(stderr, "\t -m \tmulti-threaded mode\n");
 #ifdef USE_SSL
         fprintf(stderr, "\t -a \tCA file used to verify server certificate\n");
         fprintf(stderr, "\t -d \tGNUTLS debug level\n");
         fprintf(stderr, "\t -5 \tAllow RSA-MD5 cert\n");
         fprintf(stderr, "\t -2 \tAllow RSA-MD2 cert\n");
 #endif
-        fprintf(stderr, "\t -f \tstay in foreground - do not fork\n");
-#ifdef RETRY_ON_RESET
-        fprintf(stderr, "\t -r \tretry connection on reset\n");
-#endif
-        fprintf(stderr, "\t -t \tset socket timeout in seconds (default: %i)\n", TIMEOUT);
-        fprintf(stderr, "\tmount-parameters should include the mount point\n");
+
 }
 
 #define shift { if(!argv[1]) { usage(); return 4; };\
@@ -821,15 +815,15 @@ int main(int argc, char *argv[])
                           shift;
                           break;
 #endif
-#ifdef RETRY_ON_RESET
                 case 'r': main_url.retry_reset = 1;
                           break;
-#endif
                 case 't': if (convert_num(&main_url.timeout, argv))
                               return 4;
                           shift;
                           break;
                 case 'f': do_fork = 0;
+                          break;
+                case 'm': threaded_mode = 1;
                           break;
                 default:
                           usage();
@@ -854,7 +848,7 @@ int main(int argc, char *argv[])
         return 3;
     }
 #ifdef USE_SSL
-    else {
+    else if(main_url.proto == PROTO_HTTPS) {
         print_ssl_info(main_url.ss);
     }
 #endif
@@ -873,10 +867,11 @@ int main(int argc, char *argv[])
         fork_terminal=0;
     }
 
-#ifdef USE_THREAD
-    close_client_force(&main_url); /* each thread should open its own socket */
-    pthread_key_create(&url_key, &destroy_url_copy);
-#endif
+    if(threaded_mode) {
+        close_client_force(&main_url); /* each thread should open its own socket */
+        pthread_key_create(&url_key, &destroy_url_copy);
+    }
+
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
     struct fuse_chan *ch;
     char *mountpoint;
@@ -911,7 +906,11 @@ int main(int argc, char *argv[])
                     if (se != NULL) {
                         if (fuse_set_signal_handlers(se) != -1) {
                             fuse_session_add_chan(se, ch);
-                            err = FUSE_LOOP(se);
+                            if(threaded_mode) {
+                                err = fuse_session_loop_mt(se);
+                            } else {
+                                err = fuse_session_loop(se);
+                            }
                             fuse_remove_signal_handlers(se);
                             fuse_session_remove_chan(ch);
                         }
@@ -958,8 +957,6 @@ static int close_client_force(struct_url *url) {
     return url->sock_type = SOCK_CLOSED;
 }
 
-#ifdef USE_THREAD
-
 static void destroy_url_copy(void * urlptr)
 {
     if(urlptr){
@@ -978,18 +975,18 @@ static void * create_url_copy(const struct_url * url)
 
 static struct_url * thread_setup(void)
 {
-    struct_url * res = pthread_getspecific(url_key);
-    if(!res) {
-        fprintf(stderr, "%s: Thread %d started.\n", argv0, (int)pthread_self());
-        res = create_url_copy(&main_url);
-        pthread_setspecific(url_key, res);
+    if(threaded_mode) {
+        struct_url * res = pthread_getspecific(url_key);
+        if(!res) {
+            fprintf(stderr, "%s: Thread %d started.\n", argv0, (int)pthread_self());
+            res = create_url_copy(&main_url);
+            pthread_setspecific(url_key, res);
+        }
+        return res;
+    } else {
+        return &main_url;
     }
-    return res;
 }
-
-#else /*USE_THREAD*/
-static struct_url * thread_setup(void) { return &main_url; }
-#endif
 
 
 static ssize_t read_client_socket(struct_url *url, void * buf, size_t len) {
@@ -1393,12 +1390,10 @@ exchange(struct_url *url, char * buf, const char * method,
         /* ECONNRESET happens with some dodgy servers so may need to handle that.
          * Allow for building without it in case it is not defined.
          */
-#ifdef RETRY_ON_RESET
+
 #define CONNFAIL ((res <= 0) && ! errno) || (errno == EAGAIN) || (errno == EPIPE) || \
         (url->retry_reset && (errno == ECONNRESET))
-#else
-#define CONNFAIL ((res <= 0) && ! errno) || (errno == EAGAIN) || (errno == EPIPE)
-#endif
+
         errno = 0;
         res = write_client_socket(url, buf, bytes);
         if (CONNFAIL) {

@@ -9,7 +9,7 @@ httpfs2 - mount a file from a http server into the filesystem
 
 =head1 SYNOPSIS
 
-E<10> B<httpfs2> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>E<10> B<httpfs2-mt> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>E<10> B<httpfs2-ssl> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>E<10> B<httpfs2-ssl-mt> [I<OPTIONS>] I<URL> I<FUSE-OPTIONS>
+B<httpfs2> [I<OPTIONS>] I<URL> [I<FUSE-OPTIONS>] I<MOUNT-POINT>
 
 =head1 DESCRIPTION
 
@@ -34,6 +34,30 @@ Do not fork, stay in foreground.
 
 Use different timeout for connections. Defaults to 30 seconds.
 
+=item B<-r>
+
+Retry connection on reset.
+
+=item B<-m>
+
+Run in multi-threaded mode.
+
+=item B<-a> I<file>
+
+CA file used to verify server certificate
+
+=item B<-d> I<level>
+
+Set GNUTLS debug level.
+
+=item B<-5>
+
+Allow RSA-MD5 certs.
+
+=item B<-2>
+
+Allow RSA-MD2 certs.
+
 =item I<URL>
 
 The url should specify the protocol as http or https, and it may specify
@@ -45,7 +69,12 @@ http://user:password@server.com/dir/file
 
 =item I<FUSE-OPTIONS>
 
-These options are passed to the *FUSE* library. At the very least the mount point should be specified.
+These options are passed to the *FUSE* library.
+
+=item I<MOUNT-POINT>
+
+Although httpfs2 only works on single files, the mountpoint is still a
+folder.
 
 =back
 
