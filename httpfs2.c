@@ -614,10 +614,6 @@ static void errno_report(const char * where)
     errno = e;
 }
 
-static char * url_encode(char * path) {
-    return strdup(path); /*FIXME encode*/
-}
-
 /*
  * functions for handling struct_url
  */
@@ -656,6 +652,51 @@ static void print_url(FILE *f, const struct_url * url)
 #endif
 }
 
+int digit2val(char c, int *o)
+{
+	if(c >= '0' && c <= '9') {
+		*o = c - '0';
+	} else if(c >= 'A' && c <= 'F') {
+		*o = 10 + c - 'A';
+	} else if(c >= 'a' && c <= 'f') {
+		*o = 10 + c - 'a';
+	} else {
+		return 0;
+	}
+
+	return 1;
+}
+
+
+void url_unescape(char *url)
+{
+	if(!(url[0] != '\0' && url[1] != '\0'))
+		return;
+
+	int h = 0, i = 0;
+	int c1, c2;
+	while(url[i+2] != '\0') {
+		if(url[i] == '%' && digit2val(url[i+1], &c1) && digit2val(url[i+2], &c2)) {
+			url[h] = (char)((c1 << 4) + c2);
+			i += 2;
+		} else if(i != h) {
+			url[h] = url[i];
+		}
+		i++;
+		h++;
+	}
+
+	if(i == h)
+		return;
+
+	while(url[i] != '\0') {
+		url[h] = url[i];
+		i++;
+		h++;
+	}
+	url[h] = url[i];
+}
+
 static int parse_url(const char * url, struct_url* res)
 {
     const char * url_orig = url;
@@ -683,7 +724,7 @@ static int parse_url(const char * url, struct_url* res)
 
     /* determine if path was given */
     if(strchr(url, path_start))
-        res->path = url_encode(strchr(url, path_start));
+        res->path = strdup(strchr(url, path_start));
     else{
         path_start = 0;
         res->path = strdup("/");
@@ -734,6 +775,7 @@ static int parse_url(const char * url, struct_url* res)
             url = strchr(url, '/') + 1;
         res->name = strndup(url, (size_t)(end - url));
     }
+    url_unescape(res->name);
 
     return res->proto;
 }
