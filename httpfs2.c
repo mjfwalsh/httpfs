@@ -44,6 +44,9 @@
 #include <time.h>
 #include <stddef.h>
 #include <inttypes.h>
+#ifdef __APPLE__
+#import <Foundation/Foundation.h>
+#endif
 
 #include <pthread.h>
 static pthread_key_t url_key;
@@ -697,6 +700,22 @@ void url_unescape(char *url)
 	url[h] = url[i];
 }
 
+#ifdef __APPLE__
+int decompose_utf8_string(char *utf8s)
+{
+	NSString* str = [NSString stringWithCString:utf8s encoding:NSUTF8StringEncoding];
+	if(!str) return 0;
+
+	str = [str decomposedStringWithCanonicalMapping];
+	size_t len = [str lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+	utf8s = (char *)realloc(utf8s, len + 1);
+	strcpy(utf8s, [str UTF8String]);
+	[str release];
+
+	return 1;
+}
+#endif
+
 static int parse_url(const char * url, struct_url* res)
 {
     const char * url_orig = url;
@@ -776,6 +795,11 @@ static int parse_url(const char * url, struct_url* res)
         res->name = strndup(url, (size_t)(end - url));
     }
     url_unescape(res->name);
+
+#ifdef __APPLE__
+    if(!decompose_utf8_string(res->name))
+        fprintf(stderr, "Invalid utf8 in url: %s\n", url_orig);
+#endif
 
     return res->proto;
 }

@@ -10,6 +10,12 @@ ifeq ($(shell pkg-config --atleast-version 2.10 gnutls ; echo $$?), 0)
     SSL_LDFLAGS := $(shell pkg-config gnutls --libs)
 endif
 
+OS := $(shell uname)
+ifeq ($(OS),Darwin)
+   MAIN_CFLAGS += -ObjC
+   MAIN_LDFLAGS += -framework Foundation
+endif
+
 targets = httpfs2 httpfs2.1
 
 all: $(targets)
@@ -25,7 +31,6 @@ httpfs2.1: httpfs2.pod
 
 # Rules to automatically make a Debian package
 # Avoid setting these on MacOS as it has no parsechangelog or dpkg commands
-OS := $(shell uname)
 ifneq ($(OS),Darwin)
 	package = $(shell dpkg-parsechangelog | grep ^Source: | sed -e s,'^Source: ',,)
 	version = $(shell dpkg-parsechangelog | grep ^Version: | sed -e s,'^Version: ',, -e 's,-.*,,')
