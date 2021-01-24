@@ -61,6 +61,7 @@ int threaded_mode = 0;
 #define TIMEOUT 30
 #define CONSOLE "/dev/console"
 #define HEADER_SIZE 1024
+#define EXENAME "httpfs2"
 #define VERSION "0.1.5 \"The Message\""
 
 static char* argv0;
@@ -806,13 +807,13 @@ static int parse_url(const char * url, struct_url* res)
 
 static void usage(void)
 {
-        fprintf(stderr, "%s >>> Version: %s <<<\n", __FILE__, VERSION);
+        fprintf(stderr, "%s >>> Version: %s <<<\n", EXENAME, VERSION);
         fprintf(stderr, "usage:  %s [-c console] "
                 "[-f] [-t timeout] [-r] [-m] "
 #ifdef USE_SSL
                 "[-a file] [-d n] [-5] [-2]\n\t    \t"
 #endif
-                "url [mount-parameters] mount-point\n\n", argv0);
+                "url [mount-parameters] mount-point\n\n", EXENAME);
 
         fprintf(stderr, "\t -c \tuse console for standard input/output/error (default: %s)\n", CONSOLE);
         fprintf(stderr, "\t -f \tstay in foreground and do not fork\n");

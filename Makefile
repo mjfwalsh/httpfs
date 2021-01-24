@@ -34,7 +34,7 @@ httpfs2.1: httpfs2.pod
 ifneq ($(OS),Darwin)
 	package = $(shell dpkg-parsechangelog | grep ^Source: | sed -e s,'^Source: ',,)
 	version = $(shell dpkg-parsechangelog | grep ^Version: | sed -e s,'^Version: ',, -e 's,-.*,,')
-	revision = $(shell dpkg-parsechangelog | grep ^Version: | sed -e -e 's,.*-,,')
+	revision = $(shell dpkg-parsechangelog | grep ^Version: | sed -e s,'.*-',,)
 	architecture = $(shell dpkg --print-architecture)
 	tar_dir = $(package)-$(version)
 	tar_gz   = $(tar_dir).tar.gz
@@ -64,7 +64,7 @@ $(pkg_deb_dir):
 	mkdir $(pkg_deb_dir)
 
 $(pkg_deb_dir)/$(tar_gz): $(pkg_deb_dir)
-	hg archive -t tgz $(pkg_deb_dir)/$(tar_gz)
+	git archive --format=tgz -o $(pkg_deb_dir)/$(tar_gz) HEAD
 
 $(orig_tar_gz): $(pkg_deb_dir)/$(tar_gz)
 	ln -s $(tar_gz) $(orig_tar_gz)
